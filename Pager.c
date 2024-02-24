@@ -22,7 +22,6 @@ typedef struct {
 //change (rename) new_table fxn to open_database
 // create Pager* pager, initialize table and pager values 
 // accordingly
-
 //for fd
 int fd = open(filename,O_RDWR |      // Read/Write mode
                     O_CREAT,  // Create file if it does not exist
