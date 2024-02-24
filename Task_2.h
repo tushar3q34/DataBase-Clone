@@ -49,6 +49,7 @@ extern const uint32_t ID_OFFSET;
 extern const uint32_t USERNAME_OFFSET;
 extern const uint32_t EMAIL_OFFSET;
 extern const uint32_t ROW_SIZE;
+extern const uint32_t PAGE_SIZE;
 
 #define TABLE_MAX_PAGES 100
 
