@@ -11,10 +11,6 @@
 
 void print_prompt() { printf("db > "); }
 
-void *get_page(Pager *pager, uint32_t page_num)
-{
-    return pager->pages[page_num];
-}
 // Struct defns given in Task2.h
 // Function declarations are also given in Task2.h
 // You need not use the same fxns, modify according to your implementation
