@@ -45,7 +45,7 @@ void db_close(Table* table)
             if((table->num_rows) - (i+1)*ROWS_PER_PAGE >= 0)
              pager_flush(table->pager,i,PAGE_SIZE);
             else
-             pager_flush(table->pager,i,(table->num_rows)%ROWS_PER_PAGE);
+             pager_flush(table->pager,i,((table->num_rows)%ROWS_PER_PAGE)*ROW_SIZE);
         }
     }    
     close((table->pager)->file_descriptor);
