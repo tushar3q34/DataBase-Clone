@@ -26,7 +26,11 @@ void close_input_buffer(InputBuffer *input_buffer)
 
 void pager_flush(Pager *pager, uint32_t page_num, uint32_t size);
 {
-    write(pager->file_descriptor,pager->pages[page_num],(size_t)size);
+    int status = write(pager->file_descriptor,pager->pages[page_num],(size_t)size);
+    if(status == -1)
+    printf("Error while flushing pages\n");
+    if(status == 0)
+    printf("Reached the end of file\n");
     pager->pages[page_num] = NULL;
 }
 
