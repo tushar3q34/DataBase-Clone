@@ -29,6 +29,20 @@ void* get_page(Pager* pager, uint32_t page_num) {
     return page;
 }
 
+ReadInputStatus read_input(InputBuffer* input_buffer) {
+
+    input_buffer->input_length = getline(&(input_buffer->buffer), &(input_buffer->buffer_length),stdin);
+    
+    if(input_buffer->input_length == -1) {
+        puts("ERROR WHILE GETTING INPUT (GETLINE)");
+        return BUFFER_NOT_CREATED;
+        }
+    else {
+        input_buffer->buffer[input_buffer->input_length - 1] = '\0';
+        return BUFFER_CREATED;
+    }
+}
+
 void close_input_buffer(InputBuffer *input_buffer)
 {
     free(input_buffer->buffer);
