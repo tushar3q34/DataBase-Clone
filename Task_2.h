@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+typedef enum { BUFFER_CREATED, BUFFER_NOT_CREATED } ReadInputStatus;
+
 typedef enum
 {
     STATEMENT_INSERT,
@@ -175,5 +178,5 @@ ExecuteResult execute_insert(Statement *statement, Table *table);
 ExecuteResult execute_select(Statement *statement, Table *table);
 ExecuteResult execute_statement(Statement *statement, Table *table);
 InputBuffer *new_input_buffer();
-void read_input(InputBuffer *input_buffer);
+ReadInputStatus read_input(InputBuffer *input_buffer);
 void close_input_buffer(InputBuffer *input_buffer);
