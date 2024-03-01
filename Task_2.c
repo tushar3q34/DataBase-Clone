@@ -30,6 +30,9 @@ void* get_page(Pager* pager, uint32_t page_num) {
 }
 
 ReadInputStatus read_input(InputBuffer* input_buffer) {
+    /*
+        @mandeep check and update the function as needed
+    */
 
     input_buffer->input_length = getline(&(input_buffer->buffer), &(input_buffer->buffer_length),stdin);
     
