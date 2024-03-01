@@ -22,6 +22,7 @@ void print_prompt() { printf("db > "); }
 void* get_page(Pager* pager, uint32_t page_num) {
     void* page = pager->pages[page_num];
     if (page == NULL) {   // new page
+    // Cache miss. Allocate memory and load from file.
     // Allocate memory only when we try to access page
     page = pager->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
     }
