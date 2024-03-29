@@ -9,6 +9,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+const uint32_t ID_SIZE = sizeof(uint32_t);
+const uint32_t ID_OFFSET = 0;
+const uint32_t USERNAME_SIZE = 32;
+const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+const uint32_t EMAIL_SIZE = 255;
+const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
+const uint32_t PAGE_SIZE = 4096;
+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
+
 void print_prompt() { printf("db > "); }
 
 void serialize_row(Row *source, void *destination)
@@ -32,10 +42,20 @@ void deserialize_row(void *source, Row *destination)
 // You can add/delete things from .h file according to your code
 
 // add all fxns from task-1 here
+void *row_slot(Table *table, uint32_t row_num)
+{
+    uint32_t page_num = row_num / ROWS_PER_PAGE;
+    void *page = get_page(table->pager, page_num);
+    uint32_t row_offset = row_num % ROWS_PER_PAGE;
+    uint32_t byte_offset = row_offset * ROW_SIZE;
+    return page + byte_offset;
+}
+
 void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
 {
     off_t offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
-    int status = write(pager->file_descriptor, pager->pages[page_num], (size_t)size);
+    int status =
+        write(pager->file_descriptor, pager->pages[page_num], (size_t)size);
     if (status == -1)
         printf("Error while flushing pages\n");
     if (status == 0)
@@ -53,7 +73,8 @@ void db_close(Table *table)
             if ((table->num_rows) - (i + 1) * ROWS_PER_PAGE >= 0)
                 pager_flush(table->pager, i, PAGE_SIZE);
             else
-                pager_flush(table->pager, i, ((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+                pager_flush(table->pager, i,
+                            ((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
         }
     }
     close((table->pager)->file_descriptor);
@@ -63,7 +84,7 @@ void db_close(Table *table)
 
 MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
-    if (!strcmp((input_buffer->buffer + 1), "exit "))
+    if (!strcmp((input_buffer->buffer), ".exit"))
     {
         close_input_buffer(input_buffer);
         db_close(table);
@@ -73,11 +94,12 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
         return META_COMMAND_UNRECOGNIZED_COMMAND;
 }
 
-PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement)
+PrepareResult prepare_statement(InputBuffer *input_buffer,
+                                Statement *statement)
 {
     int count = 0;
     char *string = input_buffer->buffer;
-    char *token = strtok(string, " "); // Each token at a time
+    char *token = strtok(string, " ");
     char insert[7] = "insert";
     char select[7] = "select";
     if (strcmp(token, insert) == 0)
@@ -90,49 +112,54 @@ PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement)
             token = strtok(NULL, " ");
             if (token != NULL)
             {
-                if (count == 1) // First argument of insert
+                if (count == 1)
                 {
                     char *ptr;
                     int num = strtol(token, &ptr, 10);
                     if (num >= 0)
                     {
                         statement->row_to_insert.id = (uint32_t)num;
-                        return PREPARE_SUCCESS;
                     }
                     else
+                    {
                         return PREPARE_NEGATIVE_ID;
+                    }
                 }
-                if (count == 2) // Second argument of insert
+                else if (count == 2)
                 {
                     if (strlen(token) > COLUMN_USERNAME_SIZE)
                         return PREPARE_STRING_TOO_LONG;
                     else
-                    {
                         strcpy(statement->row_to_insert.username, token);
-                        return PREPARE_SUCCESS;
-                    }
                 }
-                if (count == 3) // Third argument of insert
+                else if (count == 3)
                 {
                     if (strlen(token) > COLUMN_EMAIL_SIZE)
                         return PREPARE_STRING_TOO_LONG;
                     else
-                    {
                         strcpy(statement->row_to_insert.email, token);
-                        return PREPARE_SUCCESS;
-                    }
                 }
-                if (count == 4) // If more than 3 arguments then incorrect num of arguments
+                else
+                {
                     return PREPARE_SYNTAX_ERROR;
+                }
             }
         }
-        if (count < 4) // Similarly if less arguments
+        if (count < 3)
+        {
             return PREPARE_SYNTAX_ERROR;
+        }
+        return PREPARE_SUCCESS;
     }
     else if (strcmp(token, select) == 0)
-        statement->type = STATEMENT_SELECT; // For select statement
+    {
+        statement->type = STATEMENT_SELECT;
+        return PREPARE_SUCCESS;
+    }
     else
+    {
         return PREPARE_UNRECOGNIZED_STATEMENT;
+    }
 }
 
 Pager *pager_open(const char *filename)
@@ -204,7 +231,8 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
         @mandeep check and update the function as needed
     */
 
-    input_buffer->input_length = getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
+    input_buffer->input_length =
+        getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
 
     if (input_buffer->input_length == -1)
     {
@@ -224,10 +252,6 @@ void close_input_buffer(InputBuffer *input_buffer)
     free(input_buffer);
 }
 
-
-
-
-
 void *get_page(Pager *pager, uint32_t page_num)
 {
     void *page = pager->pages[page_num];
@@ -245,4 +269,72 @@ void *get_page(Pager *pager, uint32_t page_num)
 
 int main(int argc, char *argv[])
 {
+    if (argc < 2)
+    {
+        printf("Give a database filename.\n");
+        exit(EXIT_FAILURE);
+    }
+    char *filename = argv[1];
+    Table *table = db_open(filename);
+    InputBuffer *input_buffer = new_input_buffer();
+    if (input_buffer == NULL || table == NULL)
+    {
+        printf("Memory allocation failed.\n");
+        exit(EXIT_FAILURE);
+    }
+    while (true)
+    {
+        print_prompt();
+        ReadInputStatus status = read_input(input_buffer);
+        if (status == BUFFER_NOT_CREATED)
+        {
+            printf("Error reading input\n");
+            continue;
+        }
+        if (input_buffer->buffer[0] == '.')
+        {
+            switch (do_meta_command(input_buffer, table))
+            {
+            case META_COMMAND_SUCCESS:
+                exit(EXIT_SUCCESS);
+                continue;
+            case META_COMMAND_UNRECOGNIZED_COMMAND:
+                printf("Unrecognized command '%s'\n", input_buffer->buffer);
+                continue;
+            }
+        }
+        Statement statement;
+        switch (prepare_statement(input_buffer, &statement))
+        {
+        case PREPARE_SUCCESS:
+            break;
+        case PREPARE_NEGATIVE_ID:
+            printf("ID must be positive\n");
+            continue;
+        case PREPARE_STRING_TOO_LONG:
+            printf("String is too long\n");
+            continue;
+        case PREPARE_SYNTAX_ERROR:
+            printf("Syntax error\n");
+            continue;
+        case PREPARE_UNRECOGNIZED_STATEMENT:
+            printf("Unrecognized keyword '%s'.\n", input_buffer->buffer);
+            continue;
+        }
+        switch (execute_statement(&statement, table))
+        {
+        case EXECUTE_SUCCESS:
+            printf("Executed.\n");
+            break;
+        case EXECUTE_TABLE_FULL:
+            printf("Table full.\n");
+            break;
+        case EXECUTE_FAIL:
+            printf("Execution failed.\n");
+            break;
+        }
+    }
+    close_input_buffer(input_buffer);
+    db_close(table);
+    return 0;
 }
