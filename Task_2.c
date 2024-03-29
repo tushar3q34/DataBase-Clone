@@ -18,6 +18,34 @@ void print_prompt() { printf("db > "); }
 // You can add/delete things from .h file according to your code
 
 // add all fxns from task-1 here
+
+void* get_page(Pager* pager, uint32_t page_num) {
+    void* page = pager->pages[page_num];
+    if (page == NULL) {   // new page
+    // Cache miss. Allocate memory and load from file.
+    // Allocate memory only when we try to access page
+    page = pager->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
+    }
+    return page;
+}
+
+ReadInputStatus read_input(InputBuffer* input_buffer) {
+    /*
+        @mandeep check and update the function as needed
+    */
+
+    input_buffer->input_length = getline(&(input_buffer->buffer), &(input_buffer->buffer_length),stdin);
+    
+    if(input_buffer->input_length == -1) {
+        puts("ERROR WHILE GETTING INPUT (GETLINE)");
+        return BUFFER_NOT_CREATED;
+        }
+    else {
+        input_buffer->buffer[input_buffer->input_length - 1] = '\0';
+        return BUFFER_CREATED;
+    }
+}
+
 void close_input_buffer(InputBuffer *input_buffer)
 {
     free(input_buffer->buffer);
