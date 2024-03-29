@@ -58,7 +58,6 @@ typedef struct
     size_t buffer_length;
     ssize_t input_length;
 } InputBuffer;
-
 typedef enum
 {
     META_COMMAND_SUCCESS,
@@ -108,12 +107,14 @@ typedef struct
 
 Cursor *table_start(Table *table);
 Cursor *table_end(Table *table);
+void *row_slot(Table *table, uint32_t row_num);
 void *cursor_value(Cursor *cursor);
 void cursor_advance(Cursor *cursor);
 void pager_flush(Pager *pager, uint32_t page_num, uint32_t size);
 void db_close(Table *table);
 MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table);
-PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement);
+PrepareResult prepare_statement(InputBuffer *input_buffer,
+                                Statement *statement);
 Pager *pager_open(const char *filename);
 Table *db_open(const char *filename);
 void print_row(Row *row);
