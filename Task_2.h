@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-typedef enum { BUFFER_CREATED, BUFFER_NOT_CREATED } ReadInputStatus;
+typedef enum
+{
+    BUFFER_CREATED,
+    BUFFER_NOT_CREATED
+} ReadInputStatus;
 
 typedef enum
 {
@@ -45,7 +48,8 @@ typedef enum
 typedef enum
 {
     EXECUTE_SUCCESS,
-    EXECUTE_TABLE_FULL
+    EXECUTE_TABLE_FULL,
+    EXECUTE_FAIL
 } ExecuteResult;
 
 typedef struct
@@ -109,73 +113,10 @@ void cursor_advance(Cursor *cursor);
 void pager_flush(Pager *pager, uint32_t page_num, uint32_t size);
 void db_close(Table *table);
 MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table);
-PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement);
-PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement)
-{
-    int count = 0;
-    char *string = input_buffer->buffer;
-    char *token = strtok(string, " "); // Each token at a time
-    char insert[7] = "insert";
-    char select[7] = "select";
-    if (strcmp(token, insert) == 0)
-    {
-        statement->type = STATEMENT_INSERT;
-        while (token != NULL)
-        {
-            count++;
-
-            token = strtok(NULL, " ");
-            if (token != NULL)
-            {
-                if (count == 1) // First argument of insert
-                {
-                    char *ptr;
-                    int num = strtol(token, &ptr, 10);
-                    if (num >= 0)
-                    {
-                        statement->row_to_insert.id = (uint32_t)num;
-                        return PREPARE_SUCCESS;
-                    }
-                    else
-                        return PREPARE_NEGATIVE_ID;
-                }
-                if (count == 2) // Second argument of insert
-                {
-                    if (strlen(token) > COLUMN_USERNAME_SIZE)
-                        return PREPARE_STRING_TOO_LONG;
-                    else
-                    {
-                        strcpy(statement->row_to_insert.username, token);
-                        return PREPARE_SUCCESS;
-                    }
-                }
-                if (count == 3) // Third argument of insert
-                {
-                    if (strlen(token) > COLUMN_EMAIL_SIZE)
-                        return PREPARE_STRING_TOO_LONG;
-                    else
-                    {
-                        strcpy(statement->row_to_insert.email, token);
-                        return PREPARE_SUCCESS;
-                    }
-                }
-                if (count == 4) // If more than 3 arguments then incorrect num of arguments
-                    return PREPARE_SYNTAX_ERROR;
-            }
-        }
-        if (count < 4) // Similarly if less arguments
-            return PREPARE_SYNTAX_ERROR;
-    }
-    else if (strcmp(token, select) == 0)
-        statement->type = STATEMENT_SELECT; // For select statement
-    else
-        return PREPARE_UNRECOGNIZED_STATEMENT;
-}
+PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement);
 Pager *pager_open(const char *filename);
 Table *db_open(const char *filename);
 void print_row(Row *row);
-ExecuteResult execute_insert(Statement *statement, Table *table);
-ExecuteResult execute_select(Statement *statement, Table *table);
 ExecuteResult execute_statement(Statement *statement, Table *table);
 InputBuffer *new_input_buffer();
 ReadInputStatus read_input(InputBuffer *input_buffer);
