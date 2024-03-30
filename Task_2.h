@@ -121,4 +121,4 @@ void print_row(Row *row);
 ExecuteResult execute_statement(Statement *statement, Table *table);
 InputBuffer *new_input_buffer();
 ReadInputStatus read_input(InputBuffer *input_buffer);
-void close_input_buffer(InputBuffer *input_buffer);
+void close_input_buffer(InputBuffer **input_buffer);

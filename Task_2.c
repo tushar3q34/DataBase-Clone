@@ -24,15 +24,15 @@ void print_prompt() { printf("db > "); }
 void serialize_row(Row *source, void *destination)
 {
     memcpy(destination + ID_OFFSET, &(source->id), ID_SIZE);
-    memcpy(destination + USERNAME_OFFSET, &(source->id), USERNAME_SIZE);
-    memcpy(destination + EMAIL_OFFSET, &(source->id), EMAIL_SIZE);
+    memcpy(destination + USERNAME_OFFSET, &(source->username), USERNAME_SIZE);
+    memcpy(destination + EMAIL_OFFSET, &(source->email), EMAIL_SIZE);
 }
 
 void deserialize_row(void *source, Row *destination)
 {
     memcpy(&(destination->id), source + ID_OFFSET, ID_SIZE);
-    memcpy(&(destination->id), source + USERNAME_OFFSET, USERNAME_SIZE);
-    memcpy(&(destination->id), source + EMAIL_OFFSET, EMAIL_SIZE);
+    memcpy(&(destination->username), source + USERNAME_OFFSET, USERNAME_SIZE);
+    memcpy(&(destination->email), source + EMAIL_OFFSET, EMAIL_SIZE);
 }
 
 // Struct defns given in Task2.h
@@ -55,7 +55,7 @@ void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
 {
     off_t offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
     int status =
-        write(pager->file_descriptor, pager->pages[page_num], (size_t)size);
+        pwrite(pager->file_descriptor, pager->pages[page_num], (size_t)size, offset);
     if (status == -1)
         printf("Error while flushing pages\n");
     if (status == 0)
@@ -65,16 +65,19 @@ void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
 
 void db_close(Table *table)
 {
-    int i;
-    for (i = 0; i < TABLE_MAX_PAGES; i++)
+    for (int i = 0; i < TABLE_MAX_PAGES; i++)
     {
         if ((table->pager)->pages[i] != NULL)
         {
-            if ((table->num_rows) - (i + 1) * ROWS_PER_PAGE >= 0)
+            if (((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE)) >= 0)
+            {
                 pager_flush(table->pager, i, PAGE_SIZE);
+            }
             else
+            {
                 pager_flush(table->pager, i,
                             ((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+            }
         }
     }
     close((table->pager)->file_descriptor);
@@ -86,7 +89,7 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
     if (!strcmp((input_buffer->buffer), ".exit"))
     {
-        close_input_buffer(input_buffer);
+        close_input_buffer(&input_buffer);
         db_close(table);
         return META_COMMAND_SUCCESS;
     }
@@ -183,6 +186,21 @@ Table *db_open(const char *filename)
     Table *table = (Table *)calloc(1, sizeof(Table));
     table->pager = pager_open(filename);
     table->num_rows = ((table->pager)->file_length) / ROW_SIZE;
+    Pager *pager = table->pager;
+    if (table->num_rows != 0)
+    {
+        for (int i = 0; i < TABLE_MAX_PAGES; i++)
+        {
+            void *page = get_page(pager, i);
+            if ((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE) >= 0)
+                read(pager->file_descriptor, page, (size_t)(ROW_SIZE * ROWS_PER_PAGE));
+            else
+            {
+                int status = read(pager->file_descriptor, page, (size_t)((table->num_rows - (i)*ROWS_PER_PAGE) * ROW_SIZE));
+                break;
+            }
+        }
+    }
     return table;
 }
 
@@ -233,7 +251,6 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
 
     input_buffer->input_length =
         getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
-
     if (input_buffer->input_length == -1)
     {
         puts("ERROR WHILE GETTING INPUT (GETLINE)");
@@ -246,10 +263,11 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
     }
 }
 
-void close_input_buffer(InputBuffer *input_buffer)
+void close_input_buffer(InputBuffer **input_buffer)
 {
-    free(input_buffer->buffer);
-    free(input_buffer);
+    free((*input_buffer)->buffer);
+    free((*input_buffer));
+    *input_buffer = NULL;
 }
 
 void *get_page(Pager *pager, uint32_t page_num)
@@ -276,6 +294,7 @@ int main(int argc, char *argv[])
     }
     char *filename = argv[1];
     Table *table = db_open(filename);
+
     InputBuffer *input_buffer = new_input_buffer();
     if (input_buffer == NULL || table == NULL)
     {
@@ -285,6 +304,7 @@ int main(int argc, char *argv[])
     while (true)
     {
         print_prompt();
+        int choice = 0;
         ReadInputStatus status = read_input(input_buffer);
         if (status == BUFFER_NOT_CREATED)
         {
@@ -296,13 +316,15 @@ int main(int argc, char *argv[])
             switch (do_meta_command(input_buffer, table))
             {
             case META_COMMAND_SUCCESS:
-                exit(EXIT_SUCCESS);
-                continue;
+                choice = 1;
+                break;
             case META_COMMAND_UNRECOGNIZED_COMMAND:
                 printf("Unrecognized command '%s'\n", input_buffer->buffer);
                 continue;
             }
         }
+        if (choice)
+            break;
         Statement statement;
         switch (prepare_statement(input_buffer, &statement))
         {
@@ -334,7 +356,5 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    close_input_buffer(input_buffer);
-    db_close(table);
     return 0;
 }
