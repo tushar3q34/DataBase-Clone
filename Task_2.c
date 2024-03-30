@@ -304,7 +304,6 @@ int main(int argc, char *argv[])
     while (true)
     {
         print_prompt();
-        int choice = 0;
         ReadInputStatus status = read_input(input_buffer);
         if (status == BUFFER_NOT_CREATED)
         {
@@ -316,15 +315,12 @@ int main(int argc, char *argv[])
             switch (do_meta_command(input_buffer, table))
             {
             case META_COMMAND_SUCCESS:
-                choice = 1;
                 break;
             case META_COMMAND_UNRECOGNIZED_COMMAND:
                 printf("Unrecognized command '%s'\n", input_buffer->buffer);
                 continue;
             }
         }
-        if (choice)
-            break;
         Statement statement;
         switch (prepare_statement(input_buffer, &statement))
         {
