@@ -21,39 +21,32 @@ const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
 
 void print_prompt() { printf("db > "); }
 
-void serialize_row(Row *source, void *destination)
+void serialize_row(Row *source, void *destination) // Serializing data to pages
 {
     memcpy(destination + ID_OFFSET, &(source->id), ID_SIZE);
     memcpy(destination + USERNAME_OFFSET, &(source->username), USERNAME_SIZE);
     memcpy(destination + EMAIL_OFFSET, &(source->email), EMAIL_SIZE);
 }
 
-void deserialize_row(void *source, Row *destination)
+void deserialize_row(void *source, Row *destination) // Deserializing data from pages
 {
     memcpy(&(destination->id), source + ID_OFFSET, ID_SIZE);
     memcpy(&(destination->username), source + USERNAME_OFFSET, USERNAME_SIZE);
     memcpy(&(destination->email), source + EMAIL_OFFSET, EMAIL_SIZE);
 }
 
-// Struct defns given in Task2.h
-// Function declarations are also given in Task2.h
-// You need not use the same fxns, modify according to your implementation
-// and edit the declarations in .h later
-// You can add/delete things from .h file according to your code
-
-// add all fxns from task-1 here
-void *row_slot(Table *table, uint32_t row_num)
+void *row_slot(Table *table, uint32_t row_num) // Slotting of row to page
 {
     uint32_t page_num = row_num / ROWS_PER_PAGE;
-    if(!(row_num % ROWS_PER_PAGE))
-    page_num--;
+    if (!(row_num % ROWS_PER_PAGE))
+        page_num--;
     void *page = get_page(table, page_num);
-    uint32_t row_offset = (row_num-1) % ROWS_PER_PAGE;
+    uint32_t row_offset = (row_num - 1) % ROWS_PER_PAGE;
     uint32_t byte_offset = row_offset * ROW_SIZE;
     return page + byte_offset;
 }
 
-void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
+void pager_flush(Pager *pager, uint32_t page_num, uint32_t size) // Writing to db and freeing heap mem
 {
     off_t offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
     int status =
@@ -62,14 +55,15 @@ void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
         printf("Error while flushing pages\n");
     if (status == 0)
         printf("Reached the end of file\n");
+    free(pager->pages[page_num]);
     pager->pages[page_num] = NULL;
 }
 
-void db_close(Table *table)
+void db_close(Table *table) // Close db
 {
     for (int i = 0; i < TABLE_MAX_PAGES; i++)
     {
-        if ((table->pager)->pages[i] != NULL)
+        if ((table->pager)->pages[i] != NULL) // Writing to db only from those pages which were accessed or written
         {
             if (((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE)) >= 0)
             {
@@ -87,7 +81,7 @@ void db_close(Table *table)
     free(table);
 }
 
-MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
+MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table) // Meta command - .exit
 {
     if (!strcmp((input_buffer->buffer), ".exit"))
     {
@@ -100,7 +94,7 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 }
 
 PrepareResult prepare_statement(InputBuffer *input_buffer,
-                                Statement *statement)
+                                Statement *statement) // Categorizing statement into insert or select
 {
     int count = 0;
     char *string = input_buffer->buffer;
@@ -167,7 +161,7 @@ PrepareResult prepare_statement(InputBuffer *input_buffer,
     }
 }
 
-Pager *pager_open(const char *filename)
+Pager *pager_open(const char *filename) // Opening file and allocating mem for pager
 {
     int fd = open(filename, O_RDWR | O_CREAT, S_IWUSR | S_IRUSR);
     if (fd == -1)
@@ -183,7 +177,7 @@ Pager *pager_open(const char *filename)
     return temp;
 }
 
-Table *db_open(const char *filename)
+Table *db_open(const char *filename) // Allocating memory for Table struct
 {
     Table *table = (Table *)calloc(1, sizeof(Table));
     table->pager = pager_open(filename);
@@ -192,7 +186,7 @@ Table *db_open(const char *filename)
     return table;
 }
 
-ExecuteResult execute_statement(Statement *statement, Table *table)
+ExecuteResult execute_statement(Statement *statement, Table *table) // Executing statements
 {
 
     if (statement->type == STATEMENT_INSERT) // For insert
@@ -231,7 +225,7 @@ InputBuffer *new_input_buffer() // Initializing Input buffer
     return input_buffer;
 }
 
-ReadInputStatus read_input(InputBuffer *input_buffer)
+ReadInputStatus read_input(InputBuffer *input_buffer) // Taking input from user
 {
 
     input_buffer->input_length =
@@ -248,38 +242,36 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
     }
 }
 
-void close_input_buffer(InputBuffer **input_buffer)
+void close_input_buffer(InputBuffer **input_buffer) // Deallocating input buffer
 {
     free((*input_buffer)->buffer);
     free((*input_buffer));
     *input_buffer = NULL;
 }
 
-void *get_page(Table *table, uint32_t page_num)
+void *get_page(Table *table, uint32_t page_num) // Reading data from db to pages
 {
     void *page = (table->pager)->pages[page_num];
     if (page == NULL)
-    { // new page
-        // Cache miss. Allocate memory and load from file.
-        // Allocate memory only when we try to access page
+    {
         if (((int)table->num_rows - (int)((page_num + 1) * ROWS_PER_PAGE)) >= 0)
         {
             // full page
             page = (table->pager)->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
-            read((table->pager)->file_descriptor,page,(size_t)ROWS_PER_PAGE * ROW_SIZE);
+            read((table->pager)->file_descriptor, page, (size_t)ROWS_PER_PAGE * ROW_SIZE);
         }
         else
         {
-            //partial page
+            // partial page
             page = (table->pager)->pages[page_num] = malloc(((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
-            read((table->pager)->file_descriptor,page,(size_t)((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+            read((table->pager)->file_descriptor, page, (size_t)((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
         }
     }
     return page;
 }
 
-// add pager fxns with the functionalities given in Pager_template
-// add cursor fxns with the functionalities given in Cursor_template
+// We have not included Cursor.c to Task_2.c as the only implementation of Cursor.c this time is
+// using it instead of row_slot. Functions are ready in Cursor.c -> Will implement them next time
 
 int main(int argc, char *argv[])
 {

@@ -9,19 +9,6 @@
 #include <sys/stat.h>
 #include "Task_2.h"
 
-// cursor abstraction
-
-// Create a cursor at the beginning of the table
-// Create a cursor at the end of the table
-// Access the row the cursor is pointing to
-// Advance the cursor to the next row
-
-// Use (in further tasks)
-
-// Delete the row pointed to by a cursor
-// Modify the row pointed to by a cursor
-// Search a table for a given ID, and create a cursor pointing to the row with that ID
-
 typedef struct
 {
     Table *table;
@@ -43,30 +30,19 @@ Cursor *table_end(Table *table)
     cursor->row_num = table->num_rows;
     cursor->end_of_table = true;
 }
-// creates new cursors
 
-// Now, row_slot() fxn renamed to cursor_location()
-// modify implementation accordingly
-void *cursor_location(Cursor *cursor)
+// Used row_slot() for now, will use cursor_location() from next task onwards
+void *cursor_location(Cursor *cursor) // Old row_slot() renamed to cursor_location
 {
-    uint32_t page_num;
-    uint32_t row_num = cursor->row_num;
-    Table *table = cursor->table;
-    if (row_num % ROWS_PER_PAGE != 0)
-        page_num = row_num / ROWS_PER_PAGE;
-    else
-        page_num = row_num / ROWS_PER_PAGE - 1;
-    void *page = table->pager->pages[page_num];
-    if (page == NULL)
-    {
-        page = table->pager->pages[page_num] = malloc(PAGE_SIZE);
-    }
-    uint32_t row_offset = row_num % ROWS_PER_PAGE;
+    uint32_t page_num = cursor->row_num / ROWS_PER_PAGE;
+    if (!(cursor->row_num % ROWS_PER_PAGE))
+        page_num--;
+    void *page = get_page(cursor->table, page_num);
+    uint32_t row_offset = (cursor->row_num - 1) % ROWS_PER_PAGE;
     uint32_t byte_offset = row_offset * ROW_SIZE;
     return page + byte_offset;
 }
 
-// next row
 void cursor_advance(Cursor *cursor)
 {
     if (!(cursor->end_of_table))
@@ -78,6 +54,4 @@ void cursor_advance(Cursor *cursor)
         printf("End of Table\n");
 }
 
-// use the above cursor fxns (instead of rows) in
-// insert (table_end, etc.)
-// select (table_begin, aursor_advance, etc.)
+// Further implementation later ....
