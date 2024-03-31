@@ -189,20 +189,6 @@ Table *db_open(const char *filename)
     table->pager = pager_open(filename);
     table->num_rows = ((table->pager)->file_length) / ROW_SIZE;
     Pager *pager = table->pager;
-    if (table->num_rows != 0)
-    {
-        for (int i = 0; i < TABLE_MAX_PAGES; i++)
-        {
-            void *page = get_page(table, i);
-            if ((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE) >= 0)
-                read(pager->file_descriptor, page, (size_t)(ROW_SIZE * ROWS_PER_PAGE));
-            else
-            {
-                int status = read(pager->file_descriptor, page, (size_t)((table->num_rows - (i)*ROWS_PER_PAGE) * ROW_SIZE));
-                break;
-            }
-        }
-    }
     return table;
 }
 
