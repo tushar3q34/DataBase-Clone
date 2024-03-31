@@ -193,7 +193,7 @@ Table *db_open(const char *filename)
     {
         for (int i = 0; i < TABLE_MAX_PAGES; i++)
         {
-            void *page = get_page(pager, i);
+            void *page = get_page(table, i);
             if ((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE) >= 0)
                 read(pager->file_descriptor, page, (size_t)(ROW_SIZE * ROWS_PER_PAGE));
             else
@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
             switch (do_meta_command(input_buffer, table))
             {
             case META_COMMAND_SUCCESS:
-                break;
+                exit(EXECUTE_SUCCESS);
             case META_COMMAND_UNRECOGNIZED_COMMAND:
                 printf("Unrecognized command '%s'\n", input_buffer->buffer);
                 continue;
