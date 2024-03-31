@@ -24,15 +24,15 @@ void print_prompt() { printf("db > "); }
 void serialize_row(Row *source, void *destination)
 {
     memcpy(destination + ID_OFFSET, &(source->id), ID_SIZE);
-    memcpy(destination + USERNAME_OFFSET, &(source->id), USERNAME_SIZE);
-    memcpy(destination + EMAIL_OFFSET, &(source->id), EMAIL_SIZE);
+    memcpy(destination + USERNAME_OFFSET, &(source->username), USERNAME_SIZE);
+    memcpy(destination + EMAIL_OFFSET, &(source->email), EMAIL_SIZE);
 }
 
 void deserialize_row(void *source, Row *destination)
 {
     memcpy(&(destination->id), source + ID_OFFSET, ID_SIZE);
-    memcpy(&(destination->id), source + USERNAME_OFFSET, USERNAME_SIZE);
-    memcpy(&(destination->id), source + EMAIL_OFFSET, EMAIL_SIZE);
+    memcpy(&(destination->username), source + USERNAME_OFFSET, USERNAME_SIZE);
+    memcpy(&(destination->email), source + EMAIL_OFFSET, EMAIL_SIZE);
 }
 
 // Struct defns given in Task2.h
@@ -45,8 +45,10 @@ void deserialize_row(void *source, Row *destination)
 void *row_slot(Table *table, uint32_t row_num)
 {
     uint32_t page_num = row_num / ROWS_PER_PAGE;
-    void *page = get_page(table->pager, page_num);
-    uint32_t row_offset = row_num % ROWS_PER_PAGE;
+    if(!(row_num % ROWS_PER_PAGE))
+    page_num--;
+    void *page = get_page(table, page_num);
+    uint32_t row_offset = (row_num-1) % ROWS_PER_PAGE;
     uint32_t byte_offset = row_offset * ROW_SIZE;
     return page + byte_offset;
 }
@@ -55,7 +57,7 @@ void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
 {
     off_t offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
     int status =
-        write(pager->file_descriptor, pager->pages[page_num], (size_t)size);
+        pwrite(pager->file_descriptor, pager->pages[page_num], (size_t)size, offset);
     if (status == -1)
         printf("Error while flushing pages\n");
     if (status == 0)
@@ -70,11 +72,15 @@ void db_close(Table *table)
     {
         if ((table->pager)->pages[i] != NULL)
         {
-            if ((table->num_rows) - (i + 1) * ROWS_PER_PAGE >= 0)
+            if (((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE)) >= 0)
+            {
                 pager_flush(table->pager, i, PAGE_SIZE);
+            }
             else
+            {
                 pager_flush(table->pager, i,
                             ((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+            }
         }
     }
     close((table->pager)->file_descriptor);
@@ -227,9 +233,6 @@ InputBuffer *new_input_buffer() // Initializing Input buffer
 
 ReadInputStatus read_input(InputBuffer *input_buffer)
 {
-    /*
-        @mandeep check and update the function as needed
-    */
 
     input_buffer->input_length =
         getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
@@ -252,14 +255,25 @@ void close_input_buffer(InputBuffer *input_buffer)
     free(input_buffer);
 }
 
-void *get_page(Pager *pager, uint32_t page_num)
+void *get_page(Table *table, uint32_t page_num)
 {
-    void *page = pager->pages[page_num];
+    void *page = (table->pager)->pages[page_num];
     if (page == NULL)
     { // new page
         // Cache miss. Allocate memory and load from file.
         // Allocate memory only when we try to access page
-        page = pager->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
+        if (((int)table->num_rows - (int)((page_num + 1) * ROWS_PER_PAGE)) >= 0)
+        {
+            // full page
+            page = (table->pager)->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
+            read((table->pager)->file_descriptor,page,(size_t)ROWS_PER_PAGE * ROW_SIZE);
+        }
+        else
+        {
+            //partial page
+            page = (table->pager)->pages[page_num] = malloc(((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+            read((table->pager)->file_descriptor,page,(size_t)((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+        }
     }
     return page;
 }
@@ -334,7 +348,4 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    close_input_buffer(input_buffer);
-    db_close(table);
-    return 0;
 }
