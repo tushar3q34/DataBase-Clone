@@ -45,8 +45,10 @@ void deserialize_row(void *source, Row *destination)
 void *row_slot(Table *table, uint32_t row_num)
 {
     uint32_t page_num = row_num / ROWS_PER_PAGE;
-    void *page = get_page(table->pager, page_num);
-    uint32_t row_offset = row_num % ROWS_PER_PAGE;
+    if(!(row_num % ROWS_PER_PAGE))
+    page_num--;
+    void *page = get_page(table, page_num);
+    uint32_t row_offset = (row_num-1) % ROWS_PER_PAGE;
     uint32_t byte_offset = row_offset * ROW_SIZE;
     return page + byte_offset;
 }
@@ -245,9 +247,6 @@ InputBuffer *new_input_buffer() // Initializing Input buffer
 
 ReadInputStatus read_input(InputBuffer *input_buffer)
 {
-    /*
-        @mandeep check and update the function as needed
-    */
 
     input_buffer->input_length =
         getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
@@ -270,14 +269,25 @@ void close_input_buffer(InputBuffer **input_buffer)
     *input_buffer = NULL;
 }
 
-void *get_page(Pager *pager, uint32_t page_num)
+void *get_page(Table *table, uint32_t page_num)
 {
-    void *page = pager->pages[page_num];
+    void *page = (table->pager)->pages[page_num];
     if (page == NULL)
     { // new page
         // Cache miss. Allocate memory and load from file.
         // Allocate memory only when we try to access page
-        page = pager->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
+        if (((int)table->num_rows - (int)((page_num + 1) * ROWS_PER_PAGE)) >= 0)
+        {
+            // full page
+            page = (table->pager)->pages[page_num] = malloc(ROWS_PER_PAGE * ROW_SIZE);
+            read((table->pager)->file_descriptor,page,(size_t)ROWS_PER_PAGE * ROW_SIZE);
+        }
+        else
+        {
+            //partial page
+            page = (table->pager)->pages[page_num] = malloc(((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+            read((table->pager)->file_descriptor,page,(size_t)((table->num_rows) % ROWS_PER_PAGE) * ROW_SIZE);
+        }
     }
     return page;
 }

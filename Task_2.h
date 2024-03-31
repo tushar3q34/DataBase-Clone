@@ -96,7 +96,7 @@ typedef struct
     Pager *pager;
 } Table;
 
-void *get_page(Pager *pager, uint32_t page_num);
+void *get_page(Table *table, uint32_t page_num);
 
 typedef struct
 {
