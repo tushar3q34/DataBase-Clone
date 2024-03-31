@@ -67,8 +67,7 @@ void pager_flush(Pager *pager, uint32_t page_num, uint32_t size)
 
 void db_close(Table *table)
 {
-    int i;
-    for (i = 0; i < TABLE_MAX_PAGES; i++)
+    for (int i = 0; i < TABLE_MAX_PAGES; i++)
     {
         if ((table->pager)->pages[i] != NULL)
         {
@@ -92,7 +91,7 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
     if (!strcmp((input_buffer->buffer), ".exit"))
     {
-        close_input_buffer(input_buffer);
+        close_input_buffer(&input_buffer);
         db_close(table);
         return META_COMMAND_SUCCESS;
     }
@@ -189,6 +188,21 @@ Table *db_open(const char *filename)
     Table *table = (Table *)calloc(1, sizeof(Table));
     table->pager = pager_open(filename);
     table->num_rows = ((table->pager)->file_length) / ROW_SIZE;
+    Pager *pager = table->pager;
+    if (table->num_rows != 0)
+    {
+        for (int i = 0; i < TABLE_MAX_PAGES; i++)
+        {
+            void *page = get_page(pager, i);
+            if ((int)table->num_rows - (int)((i + 1) * ROWS_PER_PAGE) >= 0)
+                read(pager->file_descriptor, page, (size_t)(ROW_SIZE * ROWS_PER_PAGE));
+            else
+            {
+                int status = read(pager->file_descriptor, page, (size_t)((table->num_rows - (i)*ROWS_PER_PAGE) * ROW_SIZE));
+                break;
+            }
+        }
+    }
     return table;
 }
 
@@ -236,7 +250,6 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
 
     input_buffer->input_length =
         getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
-
     if (input_buffer->input_length == -1)
     {
         puts("ERROR WHILE GETTING INPUT (GETLINE)");
@@ -249,10 +262,11 @@ ReadInputStatus read_input(InputBuffer *input_buffer)
     }
 }
 
-void close_input_buffer(InputBuffer *input_buffer)
+void close_input_buffer(InputBuffer **input_buffer)
 {
-    free(input_buffer->buffer);
-    free(input_buffer);
+    free((*input_buffer)->buffer);
+    free((*input_buffer));
+    *input_buffer = NULL;
 }
 
 void *get_page(Table *table, uint32_t page_num)
@@ -290,6 +304,7 @@ int main(int argc, char *argv[])
     }
     char *filename = argv[1];
     Table *table = db_open(filename);
+
     InputBuffer *input_buffer = new_input_buffer();
     if (input_buffer == NULL || table == NULL)
     {
@@ -310,8 +325,7 @@ int main(int argc, char *argv[])
             switch (do_meta_command(input_buffer, table))
             {
             case META_COMMAND_SUCCESS:
-                exit(EXIT_SUCCESS);
-                continue;
+                break;
             case META_COMMAND_UNRECOGNIZED_COMMAND:
                 printf("Unrecognized command '%s'\n", input_buffer->buffer);
                 continue;
@@ -348,4 +362,5 @@ int main(int argc, char *argv[])
             break;
         }
     }
+    return 0;
 }
